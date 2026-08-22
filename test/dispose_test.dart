@@ -1,4 +1,4 @@
-import 'package:di_core/di_core.dart';
+import 'package:di_manager/di_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class Database implements Disposable {
