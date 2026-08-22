@@ -1,4 +1,4 @@
-import 'package:di_manager/di_core.dart';
+import 'package:di_manager/di_manager.dart';
 
 class Database implements Disposable {
   @override
