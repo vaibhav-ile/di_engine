@@ -1,4 +1,4 @@
-import 'package:di_manager/di_manager.dart';
+import 'package:di_engine/di_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class ApiClient {}

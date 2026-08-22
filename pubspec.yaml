@@ -1,4 +1,4 @@
-name: di_manager
+name: di_engine
 description: A lightweight dependency injection container for Dart and Flutter.
 version: 1.0.0
 repository: https://github.com/vaibhavile-dev/di_core
