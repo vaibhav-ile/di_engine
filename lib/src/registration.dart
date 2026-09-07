@@ -5,27 +5,54 @@ typedef DisposeCallback<T> = void Function(T instance);
 
 class Registration<T> {
   final RegistrationType type;
-
-  final T Function()? factory;
-
-  final DisposeCallback<T>? disposeCallback;
+  final T Function()? _factory;
+  final DisposeCallback<T>? _disposeCallback;
 
   T? _instance;
+  bool _hasInstance = false;
 
-  bool _created = false;
-
-  Registration({
+  Registration._({
     required this.type,
-    this.factory,
-    this.disposeCallback,
     T? instance,
-  }) {
-    if (instance != null) {
-      _instance = instance;
-      _created = true;
-    }
+    bool hasInstance = false,
+    T Function()? factory,
+    DisposeCallback<T>? disposeCallback,
+  }) : _factory = factory,
+       _disposeCallback = disposeCallback,
+       _instance = instance,
+       _hasInstance = hasInstance;
+
+  /// Creates an eagerly-created singleton registration.
+  factory Registration.singleton(T instance, {DisposeCallback<T>? dispose}) {
+    return Registration._(
+      type: RegistrationType.singleton,
+      instance: instance,
+      hasInstance: true,
+      disposeCallback: dispose,
+    );
   }
 
+  /// Creates a lazily-created singleton registration.
+  factory Registration.lazySingleton(
+    T Function() factory, {
+    DisposeCallback<T>? dispose,
+  }) {
+    return Registration._(
+      type: RegistrationType.lazySingleton,
+      factory: factory,
+      disposeCallback: dispose,
+    );
+  }
+
+  /// Creates a transient factory registration.
+  ///
+  /// Factory-created instances are not owned by the container and therefore
+  /// are not disposed by the container.
+  factory Registration.factory(T Function() factory) {
+    return Registration._(type: RegistrationType.factory, factory: factory);
+  }
+
+  /// Resolves an instance according to this registration's lifecycle.
   T resolve() {
     switch (type) {
       case RegistrationType.singleton:
@@ -40,56 +67,61 @@ class Registration<T> {
   }
 
   T _resolveSingleton() {
-    if (!_created) {
-      throw StateError('Singleton registration does not contain an instance.');
-    }
+    assert(_hasInstance, 'Singleton registration must contain an instance.');
 
     return _instance as T;
   }
 
   T _resolveLazySingleton() {
-    if (!_created) {
-      final create = factory;
+    if (!_hasInstance) {
+      final factory = _factory;
 
-      if (create == null) {
-        throw StateError('Lazy singleton does not have a factory.');
-      }
+      assert(
+        factory != null,
+        'Lazy singleton registration must contain a factory.',
+      );
 
-      _instance = create();
-      _created = true;
+      _instance = factory!();
+      _hasInstance = true;
     }
 
     return _instance as T;
   }
 
   T _resolveFactory() {
-    final create = factory;
+    final factory = _factory;
 
-    if (create == null) {
-      throw StateError('Factory registration does not have a factory.');
-    }
+    assert(factory != null, 'Factory registration must contain a factory.');
 
-    return create();
+    return factory!();
   }
 
+  /// Disposes the container-owned instance if one exists.
+  ///
+  /// This method never creates a lazy singleton.
+  ///
+  /// Factory registrations do not own their created instances and therefore
+  /// have nothing to dispose.
   void dispose() {
-    if (!_created) {
+    if (type == RegistrationType.factory) {
+      return;
+    }
+
+    if (!_hasInstance) {
       return;
     }
 
     final instance = _instance;
 
-    if (instance == null) {
-      return;
+    try {
+      if (_disposeCallback != null) {
+        _disposeCallback(instance as T);
+      } else if (instance is Disposable) {
+        instance.dispose();
+      }
+    } finally {
+      _instance = null;
+      _hasInstance = false;
     }
-
-    if (disposeCallback != null) {
-      disposeCallback!(instance);
-    } else if (instance is Disposable) {
-      instance.dispose();
-    }
-
-    _instance = null;
-    _created = false;
   }
 }

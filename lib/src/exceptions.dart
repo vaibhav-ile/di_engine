@@ -1,7 +1,7 @@
 class DependencyNotRegisteredException implements Exception {
   final Type type;
 
-  DependencyNotRegisteredException(this.type);
+  const DependencyNotRegisteredException(this.type);
 
   @override
   String toString() {
@@ -13,7 +13,7 @@ class DependencyNotRegisteredException implements Exception {
 class DependencyAlreadyRegisteredException implements Exception {
   final Type type;
 
-  DependencyAlreadyRegisteredException(this.type);
+  const DependencyAlreadyRegisteredException(this.type);
 
   @override
   String toString() {
@@ -22,13 +22,49 @@ class DependencyAlreadyRegisteredException implements Exception {
   }
 }
 
-class InvalidDependencyException implements Exception {
-  final String message;
+/// Represents a failure that occurred while disposing a dependency.
+class DependencyDisposalFailure {
+  final Type type;
+  final Object error;
+  final StackTrace stackTrace;
 
-  InvalidDependencyException(this.message);
+  const DependencyDisposalFailure({
+    required this.type,
+    required this.error,
+    required this.stackTrace,
+  });
 
   @override
   String toString() {
-    return 'InvalidDependencyException: $message';
+    return 'DependencyDisposalFailure: '
+        'Failed to dispose dependency of type $type. '
+        'Error: $error';
+  }
+}
+
+/// Thrown when one or more dependencies fail during disposal.
+///
+/// All registered dependencies are still given an opportunity to dispose
+/// before this exception is thrown.
+class DependencyDisposalException implements Exception {
+  final List<DependencyDisposalFailure> failures;
+
+  const DependencyDisposalException(this.failures);
+
+  @override
+  String toString() {
+    final count = failures.length;
+    final buffer = StringBuffer(
+      'DependencyDisposalException: '
+      '$count ${count == 1 ? 'dependency' : 'dependencies'} failed to dispose.',
+    );
+
+    for (final failure in failures) {
+      buffer
+        ..writeln()
+        ..write('  - $failure');
+    }
+
+    return buffer.toString();
   }
 }

@@ -1,8 +1,14 @@
+// ignore_for_file: avoid_print
 import 'package:di_engine/di_engine.dart';
 
 class Database implements Disposable {
+  bool _disposed = false;
+
+  bool get isDisposed => _disposed;
+
   @override
   void dispose() {
+    _disposed = true;
     print('Database disposed');
   }
 }
@@ -13,35 +19,70 @@ class ApiClient {
   ApiClient(this.database);
 }
 
-class UserRepository {
+class UserController {
   final ApiClient apiClient;
 
-  UserRepository(this.apiClient);
-}
-
-class UserController {
-  final UserRepository repository;
-
-  UserController(this.repository);
+  UserController(this.apiClient);
 }
 
 void main() {
-  final di = DIContainer();
+  final container = DIContainer();
 
-  // Create immediately.
-  di.registerSingleton<Database>(Database());
+  // Eager singleton.
+  // The instance is created immediately and owned by the container.
+  container.registerSingleton<Database>(Database());
 
-  // Create on first resolve.
-  di.registerLazySingleton<ApiClient>(() => ApiClient(di.resolve<Database>()));
-
-  // Create a new instance on every resolve.
-  di.registerFactory<UserController>(
-    () => UserController(UserRepository(di.resolve<ApiClient>())),
+  // Lazy singleton.
+  // The instance is created only when first resolved.
+  container.registerLazySingleton<ApiClient>(
+    () => ApiClient(container.resolve<Database>()),
   );
 
-  final controller = di.resolve<UserController>();
+  // Factory.
+  // A new instance is created every time it is resolved.
+  container.registerFactory<UserController>(
+    () => UserController(container.resolve<ApiClient>()),
+  );
 
-  print(controller);
+  print(
+    'Database registration: '
+    '${container.getRegistrationType<Database>()}',
+  );
 
-  di.dispose();
+  print(
+    'ApiClient registration: '
+    '${container.getRegistrationType<ApiClient>()}',
+  );
+
+  print(
+    'UserController registration: '
+    '${container.getRegistrationType<UserController>()}',
+  );
+
+  // Resolve singleton.
+  final database = container.resolve<Database>();
+
+  // Resolve lazy singleton.
+  final apiClient = container.resolve<ApiClient>();
+
+  // Resolve factory twice.
+  final firstController = container.resolve<UserController>();
+  final secondController = container.resolve<UserController>();
+
+  print('Database: ${database.isDisposed}');
+  print('ApiClient uses Database: ${identical(apiClient.database, database)}');
+  print(
+    'Controllers are different: '
+    '${!identical(firstController, secondController)}',
+  );
+
+  // Dispose the container.
+  //
+  // Database and ApiClient are owned by the container and will be disposed
+  // if they implement Disposable.
+  //
+  // UserController is a factory product and is NOT container-owned.
+  container.dispose();
+
+  print('Container disposed: ${container.isDisposed}');
 }
