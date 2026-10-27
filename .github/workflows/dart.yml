@@ -1,0 +1,32 @@
+name: Dart
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        sdk: ['3.12.0', stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - run: dart pub get
+      - run: dart run di_engine:generate --config di_engine.json
+      - run: dart run di_engine:generate --config di_engine.json --check
+      - run: git diff --exit-code -- '*.config.dart' '*.module.dart'
+      - run: dart format --output=none --set-exit-if-changed lib bin test example tool
+      - run: dart analyze
+      - run: dart test
+      - run: dart run example/example.dart
+      - run: dart run example/annotated/main.dart
+      - run: dart run example/shared_manual/main.dart
+      - run: dart run example/shared_generated/main.dart
+      - run: mkdir -p build/verification
+      - run: dart compile exe example/shared_generated/main.dart -o build/verification/native_example
+      - run: ./build/verification/native_example
+      - run: dart compile js example/shared_generated/main.dart -o build/verification/web_example.js
+      - run: node -e "globalThis.self = globalThis; require('./build/verification/web_example.js');"
+      - run: dart run tool/verify_independent.dart

@@ -9,18 +9,15 @@ class Registration<T> {
   final DisposeCallback<T>? _disposeCallback;
 
   T? _instance;
-  bool _hasInstance = false;
+  bool _hasInstance;
 
   Registration._({
     required this.type,
-    T? instance,
-    bool hasInstance = false,
-    T Function()? factory,
-    DisposeCallback<T>? disposeCallback,
-  }) : _factory = factory,
-       _disposeCallback = disposeCallback,
-       _instance = instance,
-       _hasInstance = hasInstance;
+    this._instance,
+    this._hasInstance = false,
+    this._factory,
+    this._disposeCallback,
+  });
 
   /// Creates an eagerly-created singleton registration.
   factory Registration.singleton(T instance, {DisposeCallback<T>? dispose}) {
@@ -61,6 +58,7 @@ class Registration<T> {
       case RegistrationType.lazySingleton:
         return _resolveLazySingleton();
 
+      case RegistrationType.cachedFactory:
       case RegistrationType.factory:
         return _resolveFactory();
     }
@@ -112,16 +110,13 @@ class Registration<T> {
     }
 
     final instance = _instance;
+    _instance = null;
+    _hasInstance = false;
 
-    try {
-      if (_disposeCallback != null) {
-        _disposeCallback(instance as T);
-      } else if (instance is Disposable) {
-        instance.dispose();
-      }
-    } finally {
-      _instance = null;
-      _hasInstance = false;
+    if (_disposeCallback != null) {
+      _disposeCallback(instance as T);
+    } else if (instance is Disposable) {
+      instance.dispose();
     }
   }
 }
