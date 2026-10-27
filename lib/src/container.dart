@@ -9,6 +9,8 @@ class DIContainer {
       LinkedHashMap<Type, Registration<dynamic>>();
 
   bool _disposed = false;
+  bool _disposing = false;
+  final List<Type> _resolutionPath = [];
 
   /// Whether this container has been disposed.
   bool get isDisposed => _disposed;
@@ -18,6 +20,7 @@ class DIContainer {
   /// The container takes ownership of the instance and will dispose it when
   /// the registration is removed or the container is disposed.
   void registerSingleton<T>(T instance, {void Function(T instance)? dispose}) {
+    _checkMutable();
     _checkNotDisposed();
     _checkNotRegistered<T>();
 
@@ -34,6 +37,7 @@ class DIContainer {
     T Function() factory, {
     void Function(T instance)? dispose,
   }) {
+    _checkMutable();
     _checkNotDisposed();
     _checkNotRegistered<T>();
 
@@ -50,6 +54,7 @@ class DIContainer {
   /// Factory-created instances are not owned or disposed by the container.
   /// The caller is responsible for their lifecycle.
   void registerFactory<T>(T Function() factory) {
+    _checkMutable();
     _checkNotDisposed();
     _checkNotRegistered<T>();
 
@@ -66,7 +71,15 @@ class DIContainer {
       throw DependencyNotRegisteredException(T);
     }
 
-    return registration.resolve() as T;
+    if (_resolutionPath.contains(T)) {
+      throw CircularDependencyException([..._resolutionPath, T]);
+    }
+    _resolutionPath.add(T);
+    try {
+      return registration.resolve() as T;
+    } finally {
+      _resolutionPath.removeLast();
+    }
   }
 
   /// Returns whether a dependency is registered for [T].
@@ -92,6 +105,7 @@ class DIContainer {
   ///
   /// Factory-created instances are not disposed.
   void unregister<T>() {
+    _checkMutable();
     _checkNotDisposed();
 
     final registration = _registrations.remove(T);
@@ -124,64 +138,56 @@ class DIContainer {
   ///
   /// Calling dispose more than once is safe.
   void dispose() {
-    if (_disposed) {
-      return;
-    }
+    if (_disposed || _disposing) return;
+    _checkMutable();
+    _cleanup(reactivate: false);
+  }
 
-    final failures = <DependencyDisposalFailure>[];
+  /// Disposes all owned dependencies and reactivates the container.
+  ///
+  /// Cleanup failures are aggregated after all registrations have been removed.
+  /// Mutations during dependency creation or cleanup throw a [StateError].
+  void reset() {
+    _checkMutable();
+    _cleanup(reactivate: true);
+  }
 
+  void _cleanup({required bool reactivate}) {
+    _disposing = true;
     final registrations = _registrations.entries.toList().reversed;
-
-    for (final entry in registrations) {
-      try {
-        entry.value.dispose();
-      } catch (error, stackTrace) {
-        failures.add(
-          DependencyDisposalFailure(
-            type: entry.key,
-            error: error,
-            stackTrace: stackTrace,
-          ),
-        );
+    final failures = <DependencyDisposalFailure>[];
+    try {
+      for (final entry in registrations) {
+        try {
+          entry.value.dispose();
+        } catch (error, stackTrace) {
+          failures.add(
+            DependencyDisposalFailure(
+              type: entry.key,
+              error: error,
+              stackTrace: stackTrace,
+            ),
+          );
+        }
       }
+    } finally {
+      _registrations.clear();
+      _disposed = !reactivate;
+      _disposing = false;
     }
-
-    _registrations.clear();
-    _disposed = true;
-
     if (failures.isNotEmpty) {
-      throw DependencyDisposalException(failures);
+      throw DependencyDisposalException(List.unmodifiable(failures));
     }
   }
 
-  /// Disposes all dependencies and makes the container usable again.
-  ///
-  /// Like [dispose], all dependencies are given an opportunity to dispose
-  /// before any disposal exception is reported.
-  void reset() {
-    final failures = <DependencyDisposalFailure>[];
-
-    final registrations = _registrations.entries.toList().reversed;
-
-    for (final entry in registrations) {
-      try {
-        entry.value.dispose();
-      } catch (error, stackTrace) {
-        failures.add(
-          DependencyDisposalFailure(
-            type: entry.key,
-            error: error,
-            stackTrace: stackTrace,
-          ),
-        );
-      }
+  void _checkMutable() {
+    if (_disposing) {
+      throw StateError('Cannot mutate the container during cleanup.');
     }
-
-    _registrations.clear();
-    _disposed = false;
-
-    if (failures.isNotEmpty) {
-      throw DependencyDisposalException(failures);
+    if (_resolutionPath.isNotEmpty) {
+      throw StateError(
+        'Cannot mutate the container during dependency creation.',
+      );
     }
   }
 
@@ -192,6 +198,9 @@ class DIContainer {
   }
 
   void _checkNotDisposed() {
+    if (_disposing) {
+      throw StateError('Cannot resolve dependencies during cleanup.');
+    }
     if (_disposed) {
       throw StateError('Container has already been disposed.');
     }

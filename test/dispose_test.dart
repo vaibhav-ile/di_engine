@@ -1,5 +1,5 @@
-import 'package:di_engine/di_engine.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:di_engine/di_engine.dart' hide test;
+import 'package:test/test.dart';
 
 class Database implements Disposable {
   bool disposed = false;

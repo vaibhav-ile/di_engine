@@ -68,3 +68,14 @@ class DependencyDisposalException implements Exception {
     return buffer.toString();
   }
 }
+
+/// A dependency tried to resolve itself through its constructor dependency graph.
+class CircularDependencyException implements Exception {
+  final List<Type> path;
+
+  CircularDependencyException(Iterable<Type> path)
+    : path = List.unmodifiable(path);
+
+  @override
+  String toString() => 'CircularDependencyException: ${path.join(' → ')}';
+}

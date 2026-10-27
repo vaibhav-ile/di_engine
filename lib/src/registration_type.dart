@@ -1,1 +1,1 @@
-enum RegistrationType { singleton, lazySingleton, factory }
+enum RegistrationType { singleton, lazySingleton, factory, cachedFactory }

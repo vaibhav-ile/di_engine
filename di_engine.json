@@ -1,0 +1,22 @@
+{
+  "targets": [
+    {
+      "entrypoint": "test/fixtures/micro_package/injection.dart",
+      "moduleName": "DiEngineTestModulePackageModule",
+      "output": "test/fixtures/micro_package/injection.module.dart"
+    },
+    {
+      "entrypoint": "test/fixtures/injection.dart",
+      "exclude": [
+        "test/fixtures/micro_package"
+      ],
+      "classNamePattern": "^ConventionService$"
+    },
+    {
+      "entrypoint": "example/annotated/main.dart"
+    },
+    {
+      "entrypoint": "example/shared_generated/di.dart"
+    }
+  ]
+}
